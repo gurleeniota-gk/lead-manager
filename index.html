@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lead Manager</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --ink:#151A21;
+  --paper:#F7F6F2;
+  --panel:#FFFFFF;
+  --teal:#0F6E5F;
+  --teal-deep:#0B5347;
+  --amber:#C97A2B;
+  --red:#B34B3C;
+  --slate:#5B6472;
+  --line:#E3E2DB;
+  --line-soft:#EDECE6;
+  --font-display:'Fraunces', serif;
+  --font-body:'Inter', sans-serif;
+  --font-mono:'IBM Plex Mono', monospace;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.5;}
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-thumb{background:#D8D6CD;border-radius:6px;}
+
+.app{display:flex;min-height:100vh;}
+
+/* ---------- Sidebar ---------- */
+.sidebar{width:230px;flex-shrink:0;background:var(--ink);color:#F1EFE8;display:flex;flex-direction:column;padding:22px 16px;}
+.brand{font-family:var(--font-display);font-size:19px;font-weight:600;letter-spacing:.2px;margin-bottom:2px;}
+.brand-sub{font-size:11px;color:#9BA3AE;font-family:var(--font-mono);letter-spacing:.5px;text-transform:uppercase;margin-bottom:26px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:#C7CBD1;cursor:pointer;font-size:13.5px;font-weight:500;margin-bottom:2px;transition:background .15s;}
+.nav-item:hover{background:#232A34;}
+.nav-item.active{background:var(--teal);color:#fff;}
+.nav-dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55;}
+.sidebar-footer{margin-top:auto;padding-top:16px;border-top:1px solid #2B323D;}
+.role-label{font-size:10.5px;color:#8890a0;text-transform:uppercase;letter-spacing:.6px;font-family:var(--font-mono);margin-bottom:6px;}
+select#roleSwitch{width:100%;background:#1F2530;color:#F1EFE8;border:1px solid #333B47;border-radius:7px;padding:8px 8px;font-size:12.5px;font-family:var(--font-body);}
+
+/* ---------- Main ---------- */
+.main{flex:1;padding:28px 34px;max-width:1400px;}
+.pagehead{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+.pagehead h1{font-family:var(--font-display);font-weight:600;font-size:26px;margin:0;}
+.pagehead p{color:var(--slate);margin:4px 0 0;font-size:13px;}
+.btn{border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body);transition:opacity .15s;}
+.btn:hover{opacity:.88;}
+.btn-primary{background:var(--teal);color:#fff;}
+.btn-secondary{background:var(--panel);color:var(--ink);border:1px solid var(--line);}
+.btn-danger{background:#fff;color:var(--red);border:1px solid #E9C9C2;}
+.btn-sm{padding:6px 11px;font-size:12px;border-radius:6px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ---------- Stat cards ---------- */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px;}
+.stat-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+.stat-num{font-family:var(--font-display);font-size:26px;font-weight:600;}
+.stat-label{font-size:11.5px;color:var(--slate);text-transform:uppercase;letter-spacing:.4px;font-family:var(--font-mono);margin-top:2px;}
+
+/* ---------- Panel / card ---------- */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:20px;}
+.panel h2{font-family:var(--font-display);font-size:18px;font-weight:600;margin:0 0 4px;}
+.panel .sub{color:var(--slate);font-size:12.5px;margin:0 0 16px;}
+
+/* ---------- Filters ---------- */
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center;}
+.filters input[type=text]{flex:1;min-width:180px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font-body);background:var(--paper);}
+.filters select{padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;background:var(--paper);font-family:var(--font-body);color:var(--ink);}
+
+/* ---------- Table ---------- */
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--slate);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;}
+td{padding:10px 10px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
+tr.lead-row:hover{background:#FAF9F5;cursor:pointer;}
+.name-cell{font-weight:600;}
+.sub-cell{color:var(--slate);font-size:12px;}
+
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--font-mono);}
+.chip-dot{width:6px;height:6px;border-radius:50%;}
+.src-salesforce{background:#E7EEFB;color:#2A5FBF;} .src-salesforce .chip-dot{background:#2A5FBF;}
+.src-hubspot{background:#FEEFE4;color:#C9622B;} .src-hubspot .chip-dot{background:#C9622B;}
+.src-csv{background:#EAF3EC;color:#1E7A4E;} .src-csv .chip-dot{background:#1E7A4E;}
+.src-manual{background:#F1EEF7;color:#6B4FA0;} .src-manual .chip-dot{background:#6B4FA0;}
+
+.status-pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.st-new{background:#EAF3EC;color:#1E7A4E;}
+.st-contacted{background:#FEF6E4;color:#A87513;}
+.st-qualified{background:#E7EEFB;color:#2A5FBF;}
+.st-unqualified{background:#F6E9E7;color:var(--red);}
+.st-duplicate{background:#F1EEF7;color:#6B4FA0;}
+
+.icon-btn{background:none;border:none;cursor:pointer;color:var(--slate);padding:4px;border-radius:5px;font-size:14px;}
+.icon-btn:hover{background:var(--line-soft);color:var(--ink);}
+
+.empty-state{text-align:center;padding:50px 20px;color:var(--slate);}
+.empty-state .big{font-family:var(--font-display);font-size:18px;color:var(--ink);margin-bottom:6px;}
+
+/* ---------- Forms ---------- */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-grid.wide{grid-template-columns:1fr 1fr 1fr;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-size:11.5px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:.3px;font-family:var(--font-mono);}
+.field input,.field select,.field textarea{padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;font-family:var(--font-body);background:var(--paper);color:var(--ink);}
+.field textarea{resize:vertical;min-height:64px;}
+.section-label{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--teal-deep);font-weight:600;margin:18px 0 10px;padding-top:14px;border-top:1px solid var(--line-soft);}
+.section-label:first-child{border-top:none;padding-top:0;margin-top:0;}
+
+/* ---------- Dropzone ---------- */
+.dropzone{border:2px dashed var(--line);border-radius:14px;padding:38px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;}
+.dropzone:hover,.dropzone.drag{border-color:var(--teal);background:#F3F8F6;}
+.dropzone .big{font-family:var(--font-display);font-size:17px;margin-bottom:4px;}
+.dropzone .small{color:var(--slate);font-size:12.5px;}
+
+/* ---------- Mapping table ---------- */
+.map-row{display:grid;grid-template-columns:1fr 30px 1fr;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line-soft);}
+.map-row .col-name{font-family:var(--font-mono);font-size:12.5px;background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:6px 9px;}
+.map-row .arrow{text-align:center;color:var(--slate);}
+
+/* ---------- Modal ---------- */
+.overlay{position:fixed;inset:0;background:rgba(21,26,33,.45);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:50;}
+.modal{background:var(--panel);border-radius:16px;max-width:760px;width:100%;padding:26px 28px;margin-bottom:40px;}
+.modal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;}
+.modal-head h2{font-family:var(--font-display);font-size:20px;margin:0;}
+.close-x{background:none;border:none;font-size:20px;cursor:pointer;color:var(--slate);}
+
+.tag{display:inline-block;background:var(--line-soft);color:var(--ink);padding:2px 8px;border-radius:10px;font-size:11px;margin:0 4px 4px 0;}
+.timeline{border-left:2px solid var(--line);margin-left:6px;padding-left:16px;}
+.timeline-item{position:relative;padding-bottom:16px;}
+.timeline-item::before{content:'';position:absolute;left:-21px;top:3px;width:9px;height:9px;border-radius:50%;background:var(--teal);}
+.timeline-item .t-title{font-weight:600;font-size:13px;}
+.timeline-item .t-date{font-size:11.5px;color:var(--slate);font-family:var(--font-mono);}
+
+.banner{display:flex;gap:10px;align-items:flex-start;background:#FEF6E4;border:1px solid #F1DFAE;color:#7A5A0E;padding:12px 14px;border-radius:10px;font-size:12.5px;margin-bottom:18px;}
+
+.integration-card{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:12px;}
+.integration-card .name{font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:8px;}
+.integration-card .desc{color:var(--slate);font-size:12.5px;margin-top:3px;}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--teal);}
+
+.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0;}
+.summary-box{border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;}
+.summary-box .n{font-family:var(--font-display);font-size:22px;font-weight:600;}
+.summary-box .l{font-size:10.5px;text-transform:uppercase;color:var(--slate);font-family:var(--font-mono);}
+
+@media (max-width:820px){
+  .app{flex-direction:column;}
+  .sidebar{width:100%;flex-direction:row;overflow-x:auto;padding:14px;}
+  .sidebar-footer{display:none;}
+  .brand,.brand-sub{display:none;}
+  .form-grid,.form-grid.wide{grid-template-columns:1fr;}
+  .summary-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="brand">Lodestar</div>
+    <div class="brand-sub">Lead Manager</div>
+    <div id="nav"></div>
+    <div class="sidebar-footer">
+      <div class="role-label">Viewing as</div>
+      <select id="roleSwitch">
+        <option value="Admin">Admin</option>
+        <option value="Sales Manager">Sales Manager</option>
+        <option value="Sales Representative">Sales Representative</option>
+      </select>
+    </div>
+  </div>
+  <div class="main" id="main"></div>
+</div>
+<div id="modalRoot"></div>
+
+<script>
+/* =========================================================
+   API LAYER — talks to the real Express + SQLite backend.
+   Make sure the server is running: cd backend && npm start
+========================================================= */
+const API_BASE = '/api';
+
+async function api(path, options = {}) {
+  const res = await fetch(API_BASE + path, {
+    headers: options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok && res.status !== 409) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`API ${path} failed: ${res.status} ${text}`);
+  }
+  return res;
+}
+
+function titleCase(s) {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Server rows are snake_case; normalize to the shape the UI templates expect.
+function normalizeLead(l) {
+  return {
+    id: l.id,
+    firstName: l.first_name, lastName: l.last_name, email: l.email, phone: l.phone,
+    mobile: l.mobile, company: l.company, jobTitle: l.job_title, website: l.website,
+    leadSource: l.source_name || 'Manual',
+    status: titleCase(l.status || 'new'),
+    leadOwner: l.owner_name || '',
+    industry: l.industry,
+    createdDate: l.created_at, lastUpdated: l.updated_at,
+    notes: (l.notes || []).map(n => n.body).join(' \u2022 '),
+    tags: l.tags || [],
+    activityLog: (l.activities || []).map(a => ({ date: a.created_at, action: a.action, detail: a.detail })),
+  };
+}
+
+/* =========================================================
+   STATE
+========================================================= */
+let state = {
+  leads: [],
+  importHistory: [],
+  meta: { sources: [], owners: [], statuses: [] },
+  role: 'Admin',
+  route: 'dashboard',
+  search: '',
+  filters: { source: '', status: '', owner: '' },
+  apiError: null,
+};
+
+const uid = (p='L') => p + '-' + Math.random().toString(36).slice(2,8).toUpperCase();
+const fmtDate = (iso) => iso ? new Date(iso.replace(' ','T')).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : '—';
+const fmtDateTime = (iso) => iso ? new Date(iso.replace(' ','T')).toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+
+async function loadLeads() {
+  const params = new URLSearchParams();
+  if (state.search) params.set('search', state.search);
+  if (state.filters.source) params.set('source', state.filters.source);
+  if (state.filters.status) params.set('status', state.filters.status.toLowerCase());
+  if (state.filters.owner) params.set('owner', state.filters.owner);
+  const res = await api('/leads?' + params.toString());
+  const rows = await res.json();
+  state.leads = rows.map(normalizeLead);
+}
+async function loadMeta() {
+  const res = await api('/meta');
+  state.meta = await res.json();
+}
+async function loadHistory() {
+  const res = await api('/imports');
+  state.importHistory = await res.json();
+}
+
+/* =========================================================
+   NAV
+========================================================= */
+const NAV_ITEMS = [
+  {id:'dashboard', label:'Lead Dashboard'},
+  {id:'add', label:'Add Lead'},
+  {id:'import', label:'CSV / Excel Import'},
+  {id:'integrations', label:'CRM Integrations'},
+  {id:'history', label:'Import History'},
+];
+function renderNav(){
+  const nav = document.getElementById('nav');
+  nav.innerHTML = NAV_ITEMS.map(n => `
+    <div class="nav-item ${state.route===n.id?'active':''}" data-route="${n.id}">
+      <span class="nav-dot"></span>${n.label}
+    </div>`).join('');
+  nav.querySelectorAll('.nav-item').forEach(el=>{
+    el.addEventListener('click', async ()=>{ state.route = el.dataset.route; await routeLoad(); render(); });
+  });
+  document.getElementById('roleSwitch').value = state.role;
+}
+
+/* =========================================================
+   ROUTER
+========================================================= */
+async function routeLoad(){
+  try {
+    state.apiError = null;
+    if (state.route === 'dashboard') { await loadMeta(); await loadLeads(); }
+    if (state.route === 'add') { await loadMeta(); }
+    if (state.route === 'history') { await loadHistory(); }
+  } catch (e) {
+    state.apiError = e.message;
+  }
+}
+
+function render(){
+  renderNav();
+  const main = document.getElementById('main');
+  if (state.apiError) {
+    main.innerHTML = `<div class="pagehead"><h1>Can't reach the API</h1></div>
+      <div class="banner">⚠️ ${state.apiError}<br><br>Make sure the backend is running: <code>cd backend && npm start</code>, then reload this page. API base: <code>${API_BASE}</code></div>`;
+    return;
+  }
+  if(state.route==='dashboard') main.innerHTML = viewDashboard();
+  else if(state.route==='add') main.innerHTML = viewAddLead();
+  else if(state.route==='import') main.innerHTML = viewImport();
+  else if(state.route==='integrations') main.innerHTML = viewIntegrations();
+  else if(state.route==='history') main.innerHTML = viewHistory();
+  wireRouteEvents();
+}
+
+/* =========================================================
+   DASHBOARD
+========================================================= */
+function sourceChip(src){
+  const map = {Salesforce:'src-salesforce', HubSpot:'src-hubspot', CSV:'src-csv', Manual:'src-manual'};
+  const cls = map[src] || 'src-manual';
+  return `<span class="chip ${cls}"><span class="chip-dot"></span>${src}</span>`;
+}
+function statusPill(status){
+  const map = {New:'st-new', Contacted:'st-contacted', Qualified:'st-qualified', Unqualified:'st-unqualified', Duplicate:'st-duplicate'};
+  return `<span class="status-pill ${map[status]||'st-new'}">${status}</span>`;
+}
+function canDelete(){ return state.role === 'Admin'; }
+function canImport(){ return state.role === 'Admin' || state.role === 'Sales Manager'; }
+function canConfigureIntegrations(){ return state.role === 'Admin'; }
+
+function viewDashboard(){
+  const leads = state.leads;
+  const newCount = leads.filter(l=>l.status==='New').length;
+  const qualified = leads.filter(l=>l.status==='Qualified').length;
+  const dupes = leads.filter(l=>l.status==='Duplicate').length;
+
+  const rows = leads.map(l => `
+    <tr class="lead-row" data-id="${l.id}">
+      <td><span class="sub-cell">${l.id.slice(0,8)}</span></td>
+      <td><div class="name-cell">${l.firstName||''} ${l.lastName||''}</div><div class="sub-cell">${l.jobTitle||''}</div></td>
+      <td>${l.company||'—'}</td>
+      <td class="sub-cell">${l.email||'—'}<br>${l.phone||''}</td>
+      <td>${sourceChip(l.leadSource)}</td>
+      <td>${statusPill(l.status)}</td>
+      <td class="sub-cell">${l.leadOwner||'Unassigned'}</td>
+      <td class="sub-cell">${fmtDate(l.createdDate)}</td>
+      <td onclick="event.stopPropagation()">
+        <button class="icon-btn" title="View" data-view="${l.id}">👁</button>
+        ${canDelete() ? `<button class="icon-btn" title="Delete" data-del="${l.id}">🗑</button>` : ''}
+      </td>
+    </tr>`).join('');
+
+  return `
+    <div class="pagehead">
+      <div><h1>Lead Dashboard</h1><p>Live from the API — backed by leads.db.</p></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" id="exportBtn">Export CSV</button>
+        <button class="btn btn-primary" data-goto="add">+ Add Lead</button>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-num">${leads.length}</div><div class="stat-label">Total Leads</div></div>
+      <div class="stat-card"><div class="stat-num">${newCount}</div><div class="stat-label">New</div></div>
+      <div class="stat-card"><div class="stat-num">${qualified}</div><div class="stat-label">Qualified</div></div>
+      <div class="stat-card"><div class="stat-num">${dupes}</div><div class="stat-label">Flagged Duplicates</div></div>
+    </div>
+    <div class="panel">
+      <div class="filters">
+        <input type="text" id="searchInput" placeholder="Search name, email, phone, company…" value="${state.search}">
+        <select id="filterSource"><option value="">All sources</option>${state.meta.sources.map(s=>`<option ${state.filters.source===s?'selected':''}>${s}</option>`).join('')}</select>
+        <select id="filterStatus"><option value="">All statuses</option>${['New','Contacted','Qualified','Unqualified','Duplicate'].map(s=>`<option ${state.filters.status===s?'selected':''}>${s}</option>`).join('')}</select>
+        <select id="filterOwner"><option value="">All owners</option>${state.meta.owners.map(o=>`<option value="${o.id}" ${state.filters.owner===o.id?'selected':''}>${o.name}</option>`).join('')}</select>
+      </div>
+      ${leads.length ? `
+      <div style="overflow-x:auto;"><table>
+        <thead><tr><th>ID</th><th>Name</th><th>Company</th><th>Contact</th><th>Source</th><th>Status</th><th>Owner</th><th>Created</th><th>Actions</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>` : `<div class="empty-state"><div class="big">No leads match</div><div>Try clearing filters, or add a lead.</div></div>`}
+    </div>
+  `;
+}
+
+/* =========================================================
+   ADD LEAD
+========================================================= */
+function viewAddLead(){
+  return `
+    <div class="pagehead"><div><h1>Add Lead</h1><p>Manual lead entry — writes straight to the database via POST /api/leads.</p></div></div>
+    <div class="panel">
+      <form id="leadForm">
+        <div class="section-label">Basic Information</div>
+        <div class="form-grid">
+          <div class="field"><label>First Name</label><input name="firstName" required></div>
+          <div class="field"><label>Last Name</label><input name="lastName" required></div>
+          <div class="field"><label>Email</label><input name="email" type="email"></div>
+          <div class="field"><label>Phone</label><input name="phone"></div>
+          <div class="field"><label>Mobile</label><input name="mobile"></div>
+          <div class="field"><label>Company</label><input name="company"></div>
+          <div class="field"><label>Job Title</label><input name="jobTitle"></div>
+          <div class="field"><label>Website</label><input name="website"></div>
+        </div>
+        <div class="section-label">Address</div>
+        <div class="form-grid wide">
+          <div class="field"><label>Street</label><input name="street"></div>
+          <div class="field"><label>City</label><input name="city"></div>
+          <div class="field"><label>State</label><input name="state"></div>
+          <div class="field"><label>Country</label><input name="country"></div>
+          <div class="field"><label>Postal Code</label><input name="postalCode"></div>
+        </div>
+        <div class="section-label">Lead Information</div>
+        <div class="form-grid wide">
+          <div class="field"><label>Lead Source</label><select name="leadSource"><option>Manual</option><option>Referral</option><option>Website</option><option>Event</option><option>Cold Outreach</option></select></div>
+          <div class="field"><label>Industry</label><input name="industry"></div>
+          <div class="field"><label>Lead Owner</label>
+            <select name="ownerId"><option value="">Unassigned</option>${state.meta.owners.map(o=>`<option value="${o.id}">${o.name}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>Status</label><select name="status"><option value="new">New</option><option value="contacted">Contacted</option><option value="qualified">Qualified</option><option value="unqualified">Unqualified</option></select></div>
+          <div class="field"><label>Priority</label><select name="priority"><option>medium</option><option>high</option><option>low</option></select></div>
+          <div class="field"><label>Expected Deal Size</label><input name="expectedDealSize" type="number" placeholder="USD"></div>
+        </div>
+        <div class="field" style="margin-top:14px;"><label>Notes</label><textarea name="notes"></textarea></div>
+        <div class="field" style="margin-top:14px;"><label>Tags (comma separated)</label><input name="tags" placeholder="e.g. enterprise, hot"></div>
+        <div id="dupWarning"></div>
+        <div style="display:flex;gap:10px;margin-top:20px;">
+          <button type="submit" class="btn btn-primary">Save</button>
+          <button type="submit" name="addAnother" value="1" class="btn btn-secondary" id="saveAddAnother">Save &amp; Add Another</button>
+          <button type="button" class="btn btn-secondary" data-goto="dashboard">Cancel</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+/* =========================================================
+   CSV / EXCEL IMPORT (parsed client-side, sent as JSON rows)
+========================================================= */
+let importState = { rawRows: null, headers: [], mapping: {}, fileName: '' };
+
+const SYSTEM_FIELDS = [
+  {key:'firstName', label:'First Name'}, {key:'lastName', label:'Last Name'},
+  {key:'email', label:'Email'}, {key:'phone', label:'Phone'}, {key:'company', label:'Company'},
+  {key:'jobTitle', label:'Job Title'}, {key:'skip', label:'— Do not import —'},
+];
+function guessMapping(header){
+  const h = header.toLowerCase().replace(/[^a-z]/g,'');
+  const table = { firstname:'firstName', first:'firstName', fname:'firstName', lastname:'lastName', last:'lastName', lname:'lastName',
+    email:'email', emailaddress:'email', phone:'phone', phonenumber:'phone', mobile:'phone',
+    company:'company', companyname:'company', organization:'company', jobtitle:'jobTitle', title:'jobTitle' };
+  return table[h] || 'skip';
+}
+
+function viewImport(){
+  if(!canImport()){
+    return `<div class="pagehead"><h1>CSV / Excel Import</h1></div><div class="panel"><p>Your role (${state.role}) does not have permission to import leads.</p></div>`;
+  }
+  if(!importState.rawRows){
+    return `
+      <div class="pagehead"><div><h1>CSV / Excel Import</h1><p>Upload a spreadsheet — rows are sent to POST /api/imports/rows.</p></div>
+        <button class="btn btn-secondary" id="downloadTemplate">Download sample template</button></div>
+      <div class="panel">
+        <div class="dropzone" id="dropzone">
+          <div class="big">Drag & drop a CSV or Excel file</div>
+          <div class="small">.csv, .xls, .xlsx supported — or click to browse</div>
+          <input type="file" id="fileInput" accept=".csv,.xls,.xlsx" style="display:none;">
+        </div>
+      </div>`;
+  }
+  const headers = importState.headers;
+  const mapRows = headers.map(h => `
+    <div class="map-row"><div class="col-name">${h}</div><div class="arrow">→</div>
+      <select data-map="${h}">${SYSTEM_FIELDS.map(f => `<option value="${f.key}" ${importState.mapping[h]===f.key?'selected':''}>${f.label}</option>`).join('')}</select>
+    </div>`).join('');
+  return `
+    <div class="pagehead"><div><h1>Column Mapping</h1><p>${importState.fileName} — ${importState.rawRows.length} rows detected</p></div></div>
+    <div class="panel">
+      <h2>Map columns</h2><p class="sub">We auto-detected likely matches. Adjust any that look wrong.</p>
+      ${mapRows}
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button class="btn btn-primary" id="runImport">Validate &amp; Import</button>
+        <button class="btn btn-secondary" id="cancelImport">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function parseFile(file){
+  const ext = file.name.split('.').pop().toLowerCase();
+  const finish = (rows, headers) => {
+    importState.rawRows = rows; importState.headers = headers; importState.fileName = file.name;
+    importState.mapping = {}; headers.forEach(h => importState.mapping[h] = guessMapping(h));
+    render();
+  };
+  if(ext === 'csv'){
+    Papa.parse(file, { header:true, skipEmptyLines:true, complete: (res) => finish(res.data, res.meta.fields || []) });
+  } else {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:''});
+      finish(json, json.length ? Object.keys(json[0]) : []);
+    };
+    reader.readAsBinaryString(file);
+  }
+}
+
+async function runImport(){
+  const res = await api('/imports/rows', {
+    method: 'POST',
+    body: JSON.stringify({ fileName: importState.fileName, rows: importState.rawRows, mapping: importState.mapping }),
+  });
+  const summary = await res.json();
+  importState = { rawRows:null, headers:[], mapping:{}, fileName:'' };
+  await showImportSummary(summary);
+}
+
+async function showImportSummary(summary){
+  const modalRoot = document.getElementById('modalRoot');
+  const errorRows = (summary.errors||[]).map(e=>`<tr><td>${e.row}</td><td>${e.reason}</td></tr>`).join('');
+  modalRoot.innerHTML = `
+    <div class="overlay" id="summaryOverlay"><div class="modal">
+      <div class="modal-head"><h2>Import Summary</h2><button class="close-x" id="closeSummary">✕</button></div>
+      <p class="sub">${summary.fileName || 'Sync'} — job ${summary.jobId ? summary.jobId.slice(0,8) : ''}</p>
+      <div class="summary-grid">
+        <div class="summary-box"><div class="n">${summary.total}</div><div class="l">Total Rows</div></div>
+        <div class="summary-box"><div class="n" style="color:var(--teal)">${summary.success}</div><div class="l">Imported</div></div>
+        <div class="summary-box"><div class="n" style="color:var(--red)">${summary.failed}</div><div class="l">Failed</div></div>
+        <div class="summary-box"><div class="n" style="color:var(--amber)">${summary.duplicates}</div><div class="l">Flagged Duplicates</div></div>
+      </div>
+      ${summary.errors && summary.errors.length ? `
+        <h2 style="font-size:14px;margin-top:20px;">Error report</h2>
+        <table><thead><tr><th>Row</th><th>Reason</th></tr></thead><tbody>${errorRows}</tbody></table>
+        <button class="btn btn-secondary btn-sm" id="downloadErrors" style="margin-top:10px;">Download error report (CSV)</button>
+      ` : '<p style="color:var(--teal);font-weight:600;">No errors — clean import.</p>'}
+      <div style="margin-top:20px;"><button class="btn btn-primary" id="goToDashboard">Go to dashboard</button></div>
+    </div></div>`;
+  document.getElementById('closeSummary').onclick = async ()=>{ modalRoot.innerHTML=''; await routeLoad(); render(); };
+  document.getElementById('goToDashboard').onclick = async ()=>{ modalRoot.innerHTML=''; state.route='dashboard'; await routeLoad(); render(); };
+  const dl = document.getElementById('downloadErrors');
+  if (dl) dl.onclick = () => window.open(`${API_BASE}/imports/${summary.jobId}/errors`, '_blank');
+}
+
+/* =========================================================
+   CRM INTEGRATIONS (simulated sync, real DB writes)
+========================================================= */
+let integrationStatus = { Salesforce:false, HubSpot:false };
+
+function viewIntegrations(){
+  if(!canConfigureIntegrations()){
+    return `<div class="pagehead"><h1>CRM Integrations</h1></div><div class="panel"><p>Only Admins can configure CRM integrations.</p></div>`;
+  }
+  return `
+    <div class="pagehead"><div><h1>CRM Integrations</h1><p>Connect Salesforce or HubSpot to sync leads automatically.</p></div></div>
+    <div class="banner">⚠️ OAuth itself is simulated (no real API keys here) — but "Sync" makes a real POST to the API and writes real rows into leads.db, deduplicated the same way CSV imports are.</div>
+    <div class="integration-card">
+      <div><div class="name">${sourceChip('Salesforce')} Salesforce</div><div class="desc">${integrationStatus.Salesforce ? 'Connected' : 'Not connected'}</div></div>
+      <button class="btn ${integrationStatus.Salesforce?'btn-secondary':'btn-primary'} btn-sm" data-sync="salesforce">${integrationStatus.Salesforce ? 'Sync Now' : 'Connect'}</button>
+    </div>
+    <div class="integration-card">
+      <div><div class="name">${sourceChip('HubSpot')} HubSpot</div><div class="desc">${integrationStatus.HubSpot ? 'Connected' : 'Not connected'}</div></div>
+      <button class="btn ${integrationStatus.HubSpot?'btn-secondary':'btn-primary'} btn-sm" data-sync="hubspot">${integrationStatus.HubSpot ? 'Sync Now' : 'Connect'}</button>
+    </div>`;
+}
+
+async function simulateSync(provider){
+  const res = await api(`/integrations/${provider}/sync`, { method: 'POST' });
+  const summary = await res.json();
+  integrationStatus[provider === 'salesforce' ? 'Salesforce' : 'HubSpot'] = true;
+  summary.fileName = `${provider === 'salesforce' ? 'Salesforce' : 'HubSpot'} sync`;
+  await showImportSummary(summary);
+}
+
+/* =========================================================
+   IMPORT HISTORY
+========================================================= */
+function viewHistory(){
+  const rows = state.importHistory.map(h=>`
+    <tr>
+      <td class="sub-cell">${fmtDateTime(h.created_at)}</td>
+      <td>${sourceChip(titleCase(h.source==='csv'?'CSV':h.source))}</td>
+      <td>${h.total_rows}</td>
+      <td style="color:var(--teal);font-weight:600;">${h.success_count}</td>
+      <td style="color:var(--red);font-weight:600;">${h.failed_count}</td>
+      <td style="color:var(--amber);font-weight:600;">${h.duplicate_count}</td>
+      <td>${h.failed_count > 0 ? `<a class="btn btn-secondary btn-sm" href="${API_BASE}/imports/${h.id}/errors" target="_blank">Error report</a>` : '—'}</td>
+    </tr>`).join('');
+  return `
+    <div class="pagehead"><div><h1>Import History</h1><p>Every sync and upload, queried live from import_jobs.</p></div></div>
+    <div class="panel">
+      ${state.importHistory.length ? `
+      <div style="overflow-x:auto;"><table>
+        <thead><tr><th>Date</th><th>Source</th><th>Total</th><th>Success</th><th>Failed</th><th>Duplicates</th><th>Report</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>` : `<div class="empty-state"><div class="big">No imports yet</div></div>`}
+    </div>`;
+}
+
+/* =========================================================
+   LEAD DETAIL MODAL
+========================================================= */
+async function openLeadDetail(id){
+  const res = await api(`/leads/${id}`);
+  const raw = await res.json();
+  const lead = normalizeLead(raw);
+  const modalRoot = document.getElementById('modalRoot');
+  const timeline = lead.activityLog.map(a=>`
+    <div class="timeline-item"><div class="t-title">${a.action}</div><div class="t-date">${fmtDateTime(a.date)}</div>${a.detail?`<div class="sub-cell">${a.detail}</div>`:''}</div>`).join('') || '<p class="sub-cell">No activity recorded.</p>';
+
+  modalRoot.innerHTML = `
+    <div class="overlay" id="detailOverlay"><div class="modal">
+      <div class="modal-head">
+        <div><h2>${lead.firstName||''} ${lead.lastName||''}</h2><p class="sub" style="margin:2px 0 0;">${lead.jobTitle||''} ${lead.company?'at '+lead.company:''}</p></div>
+        <button class="close-x" id="closeDetail">✕</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+        ${sourceChip(lead.leadSource)} ${statusPill(lead.status)} ${(lead.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Email</label><div>${lead.email||'—'}</div></div>
+        <div class="field"><label>Phone</label><div>${lead.phone||'—'}</div></div>
+        <div class="field"><label>Owner</label><div>${lead.leadOwner||'Unassigned'}</div></div>
+        <div class="field"><label>Industry</label><div>${lead.industry||'—'}</div></div>
+        <div class="field"><label>Created</label><div>${fmtDate(lead.createdDate)}</div></div>
+        <div class="field"><label>Last Updated</label><div>${fmtDate(lead.lastUpdated)}</div></div>
+      </div>
+      ${lead.notes ? `<div class="section-label">Notes</div><p>${lead.notes}</p>` : ''}
+      <div class="section-label">Update Status</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select id="statusSelect">${['new','contacted','qualified','unqualified'].map(s=>`<option value="${s}" ${lead.status.toLowerCase()===s?'selected':''}>${titleCase(s)}</option>`).join('')}</select>
+        <input type="text" id="noteInput" placeholder="Add a note…" style="flex:1;min-width:160px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;">
+        <button class="btn btn-primary btn-sm" id="addNoteBtn">Add</button>
+      </div>
+      <div class="section-label">Timeline</div>
+      <div class="timeline">${timeline}</div>
+      <div style="margin-top:20px;display:flex;gap:10px;">
+        ${canDelete() ? `<button class="btn btn-danger btn-sm" id="deleteLeadBtn">Delete Lead</button>` : ''}
+      </div>
+    </div></div>`;
+  document.getElementById('closeDetail').onclick = ()=>{ modalRoot.innerHTML=''; };
+  document.getElementById('addNoteBtn').onclick = async ()=>{
+    const newStatus = document.getElementById('statusSelect').value;
+    const note = document.getElementById('noteInput').value.trim();
+    await api(`/leads/${id}`, { method:'PATCH', body: JSON.stringify({ status: newStatus, note: note || undefined }) });
+    await openLeadDetail(id);
+    await routeLoad(); render();
+  };
+  const delBtn = document.getElementById('deleteLeadBtn');
+  if(delBtn){
+    delBtn.onclick = async ()=>{
+      await api(`/leads/${id}`, { method:'DELETE' });
+      modalRoot.innerHTML='';
+      await routeLoad(); render();
+    };
+  }
+}
+
+/* =========================================================
+   EVENT WIRING
+========================================================= */
+function wireRouteEvents(){
+  document.getElementById('roleSwitch').onchange = async (e)=>{ state.role = e.target.value; await routeLoad(); render(); };
+  document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', async ()=>{ state.route = b.dataset.goto; await routeLoad(); render(); }));
+
+  if(state.route==='dashboard'){
+    const s = document.getElementById('searchInput');
+    let debounce;
+    if (s) s.oninput = (e)=>{ state.search = e.target.value; clearTimeout(debounce); debounce = setTimeout(async ()=>{ await loadLeads(); render(); s2focus(); }, 300); };
+    const fs = document.getElementById('filterSource'); if(fs) fs.onchange = async e=>{state.filters.source=e.target.value; await loadLeads(); render();};
+    const fst = document.getElementById('filterStatus'); if(fst) fst.onchange = async e=>{state.filters.status=e.target.value; await loadLeads(); render();};
+    const fo = document.getElementById('filterOwner'); if(fo) fo.onchange = async e=>{state.filters.owner=e.target.value; await loadLeads(); render();};
+    document.querySelectorAll('.lead-row').forEach(r=> r.addEventListener('click', ()=> openLeadDetail(r.dataset.id)));
+    document.querySelectorAll('[data-view]').forEach(b=> b.addEventListener('click', (e)=>{ e.stopPropagation(); openLeadDetail(b.dataset.view); }));
+    document.querySelectorAll('[data-del]').forEach(b=> b.addEventListener('click', async (e)=>{
+      e.stopPropagation(); if(!canDelete()) return;
+      await api(`/leads/${b.dataset.del}`, { method:'DELETE' });
+      await loadLeads(); render();
+    }));
+    const exp = document.getElementById('exportBtn');
+    if(exp) exp.onclick = ()=>{
+      const cols = ['id','firstName','lastName','email','phone','company','jobTitle','leadSource','status','leadOwner','createdDate'];
+      const csv = cols.join(',') + '\n' + state.leads.map(l=> cols.map(c=>`"${(l[c]||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'leads-export.csv'; a.click();
+    };
+  }
+
+  if(state.route==='add'){
+    const form = document.getElementById('leadForm');
+    let submitAgain = false;
+    document.getElementById('saveAddAnother').onclick = ()=> submitAgain = true;
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(form);
+      const payload = {};
+      for(const [k,v] of fd.entries()){
+        if(k==='addAnother') continue;
+        if(k==='tags'){ payload.tags = v.split(',').map(t=>t.trim()).filter(Boolean); }
+        else payload[k]=v;
+      }
+      const res = await api('/leads', { method:'POST', body: JSON.stringify(payload) });
+      if (res.status === 409) {
+        const data = await res.json();
+        const dupWarning = document.getElementById('dupWarning');
+        dupWarning.innerHTML = `<div class="banner">⚠️ Possible duplicate of <b>${data.duplicateOf.name}</b>. <button class="btn btn-secondary btn-sm" id="saveAnyway" style="margin-left:8px;">Save anyway</button></div>`;
+        document.getElementById('saveAnyway').onclick = async ()=>{
+          payload.force = true;
+          await api('/leads', { method:'POST', body: JSON.stringify(payload) });
+          if(submitAgain){ form.reset(); document.getElementById('dupWarning').innerHTML=''; }
+          else { state.route='dashboard'; await routeLoad(); render(); }
+        };
+        return;
+      }
+      if(submitAgain){ form.reset(); }
+      else { state.route='dashboard'; await routeLoad(); render(); }
+    });
+  }
+
+  if(state.route==='import'){
+    if(!importState.rawRows){
+      const dz = document.getElementById('dropzone'); const fi = document.getElementById('fileInput');
+      dz.onclick = ()=> fi.click();
+      dz.ondragover = (e)=>{ e.preventDefault(); dz.classList.add('drag'); };
+      dz.ondragleave = ()=> dz.classList.remove('drag');
+      dz.ondrop = (e)=>{ e.preventDefault(); dz.classList.remove('drag'); if(e.dataTransfer.files[0]) parseFile(e.dataTransfer.files[0]); };
+      fi.onchange = (e)=>{ if(e.target.files[0]) parseFile(e.target.files[0]); };
+      const dt = document.getElementById('downloadTemplate');
+      if (dt) dt.onclick = ()=>{
+        const csv = 'First Name,Last Name,Email,Phone,Company\nJane,Doe,jane@example.com,+1 555 0100,Acme Inc\n';
+        const blob = new Blob([csv], {type:'text/csv'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'lead-import-template.csv'; a.click();
+      };
+    } else {
+      document.querySelectorAll('[data-map]').forEach(sel=>{ sel.onchange = (e)=>{ importState.mapping[sel.dataset.map] = e.target.value; }; });
+      document.getElementById('runImport').onclick = runImport;
+      document.getElementById('cancelImport').onclick = ()=>{ importState = {rawRows:null, headers:[], mapping:{}, fileName:''}; render(); };
+    }
+  }
+
+  if(state.route==='integrations'){
+    document.querySelectorAll('[data-sync]').forEach(b => b.onclick = ()=> simulateSync(b.dataset.sync));
+  }
+}
+
+function s2focus(){ const s=document.getElementById('searchInput'); if(s){ s.focus(); s.selectionStart=s.selectionEnd=s.value.length; } }
+
+/* =========================================================
+   BOOT
+========================================================= */
+(async function init(){
+  await routeLoad();
+  render();
+})();
+</script>
+</body>
+</html>
