@@ -8,7 +8,6 @@ const pool = require('./db');
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 const upload = multer({ storage: multer.memoryStorage() });
 
 /* ---------------- helpers ---------------- */
@@ -240,7 +239,11 @@ app.post('/api/integrations/:provider/sync', ah(async (req, res) => {
   res.json({ jobId, total: sample.length, success, failed: 0, duplicates });
 }));
 
-/* ---------------- health ---------------- */
+/* ---------------- frontend + health ---------------- */
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 app.get('/api/health', ah(async (req, res) => {
   await pool.query('SELECT 1');
   res.json({ ok: true, db: 'postgres' });
