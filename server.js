@@ -8,6 +8,8 @@ const pool = require('./db');
 const app = express();
 app.use(cors());
 app.use(express.json());
+// Serves just index.html at the root URL — deliberately not the whole
+// directory (that would expose server.js, db.js, .env, etc. over HTTP).
 const upload = multer({ storage: multer.memoryStorage() });
 
 /* ---------------- helpers ---------------- */
@@ -40,6 +42,30 @@ async function logActivity(leadId, action, detail) {
 
 // wraps async route handlers so thrown errors reach Express's error handler
 const ah = fn => (req, res, next) => fn(req, res, next).catch(next);
+
+/* ---------------- real HubSpot integration ---------------- */
+
+const HUBSPOT_API_BASE = process.env.HUBSPOT_API_BASE || 'https://api.hubapi.com';
+
+async function fetchHubSpotContacts(limit = 20) {
+  const token = process.env.HUBSPOT_ACCESS_TOKEN;
+  if (!token) {
+    const err = new Error('HUBSPOT_ACCESS_TOKEN is not set');
+    err.code = 'NO_TOKEN';
+    throw err;
+  }
+  const url = `${HUBSPOT_API_BASE}/crm/v3/objects/contacts?limit=${limit}&properties=firstname,lastname,email,phone,company,jobtitle`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const err = new Error(`HubSpot API returned ${res.status}: ${text}`);
+    err.code = 'API_ERROR';
+    err.status = res.status;
+    throw err;
+  }
+  const data = await res.json();
+  return data.results || [];
+}
 
 /* ---------------- meta ---------------- */
 
@@ -206,13 +232,69 @@ app.get('/api/imports/:id/errors', ah(async (req, res) => {
   res.send(csv);
 }));
 
-/* ---------------- CRM integrations (simulated sync, real Postgres writes) ---------------- */
+/* ---------------- CRM integrations (real HubSpot sync, real Postgres writes) ---------------- */
+
+app.get('/api/integrations/status', (req, res) => {
+  res.json({
+    hubspot: { connected: Boolean(process.env.HUBSPOT_ACCESS_TOKEN), real: true },
+    salesforce: { connected: false, real: false },
+  });
+});
 
 app.post('/api/integrations/:provider/sync', ah(async (req, res) => {
-  const provider = req.params.provider === 'salesforce' ? 'Salesforce' : 'HubSpot';
-  const sample = provider === 'Salesforce'
-    ? [{ first_name: 'Kabir', last_name: 'Malhotra', email: 'kabir.malhotra@finserve.io', company: 'FinServe Corp', job_title: 'CFO', phone: '+91 98765 43210' }]
-    : [{ first_name: 'Elin', last_name: 'Berg', email: 'elin.berg@nordictech.se', company: 'Nordic Tech AB', job_title: 'COO', phone: '+46 70 987 6543' }];
+  const providerParam = req.params.provider;
+
+  /* ---- Real HubSpot sync (Private App token) ---- */
+  if (providerParam === 'hubspot') {
+    const sourceId = await getOrCreateSourceId('HubSpot');
+    let contacts;
+    try {
+      contacts = await fetchHubSpotContacts(20);
+    } catch (e) {
+      if (e.code === 'NO_TOKEN') {
+        return res.status(400).json({ error: 'HubSpot is not connected yet. Add HUBSPOT_ACCESS_TOKEN in your hosting environment variables, then try again.' });
+      }
+      if (e.status === 401) {
+        return res.status(401).json({ error: 'HubSpot rejected the access token. Double check HUBSPOT_ACCESS_TOKEN was copied correctly.' });
+      }
+      return res.status(502).json({ error: 'Could not reach HubSpot: ' + e.message });
+    }
+
+    const jobId = uuid();
+    let success = 0, duplicates = 0, skipped = 0;
+
+    for (const c of contacts) {
+      const p = c.properties || {};
+      if (!p.email && !p.phone) { skipped++; continue; }
+
+      // avoid re-importing the same HubSpot contact on repeat syncs
+      const already = await pool.query('SELECT id FROM leads WHERE external_id = $1 AND lead_source_id = $2', [c.id, sourceId]);
+      if (already.rows[0]) { skipped++; continue; }
+
+      const lead = { first_name: p.firstname || '', last_name: p.lastname || '', email: p.email || '', phone: p.phone || '', company: p.company || '', job_title: p.jobtitle || '' };
+      const dupe = await findDuplicate(lead);
+      const status = dupe ? 'duplicate' : 'new';
+      if (dupe) duplicates++;
+      const id = uuid();
+      await pool.query(`
+        INSERT INTO leads (id, first_name, last_name, email, phone, company, job_title, lead_source_id, status, external_id)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      `, [id, lead.first_name, lead.last_name, lead.email, lead.phone, lead.company, lead.job_title, sourceId, status, c.id]);
+      await logActivity(id, 'Synced', 'via HubSpot integration (real API)');
+      success++;
+    }
+
+    await pool.query(`
+      INSERT INTO import_jobs (id, source, file_name, status, total_rows, success_count, failed_count, duplicate_count, started_at, completed_at)
+      VALUES ($1,'hubspot','HubSpot sync','completed',$2,$3,0,$4, now(), now())
+    `, [jobId, contacts.length, success, duplicates]);
+
+    return res.json({ jobId, total: contacts.length, success, failed: 0, duplicates, skipped, real: true });
+  }
+
+  /* ---- Salesforce: still simulated until that integration is built ---- */
+  const provider = 'Salesforce';
+  const sample = [{ first_name: 'Kabir', last_name: 'Malhotra', email: 'kabir.malhotra@finserve.io', company: 'FinServe Corp', job_title: 'CFO', phone: '+91 98765 43210' }];
 
   const sourceId = await getOrCreateSourceId(provider);
   let success = 0, duplicates = 0;
@@ -236,7 +318,7 @@ app.post('/api/integrations/:provider/sync', ah(async (req, res) => {
     VALUES ($1,$2,$3,'completed',$4,$5,0,$6, now(), now())
   `, [jobId, provider.toLowerCase(), `${provider} sync`, sample.length, success, duplicates]);
 
-  res.json({ jobId, total: sample.length, success, failed: 0, duplicates });
+  res.json({ jobId, total: sample.length, success, failed: 0, duplicates, real: false });
 }));
 
 /* ---------------- frontend + health ---------------- */
